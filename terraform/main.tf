@@ -1,6 +1,20 @@
+# main.tf
+
+# Provider configuration
 provider "azurerm" {
   features {}
-  subscription_id = "" # Replace with your Azure subscription ID
+  subscription_id = "0cb69517-b7d3-4bde-a4b7-3905c5b3d55c" # Your Azure subscription ID
+}
+
+# Variables for SSH key paths
+variable "private_key_path" {
+  description = "Path to the SSH private key"
+  default     = "~/.ssh/terraform/terraform_key"  # Path from your earlier commands
+}
+
+variable "public_key_path" {
+  description = "Path to the SSH public key"
+  default     = "~/.ssh/terraform/terraform_key.pub"  # Path from your earlier commands
 }
 
 # Resource Group
@@ -34,12 +48,13 @@ resource "azurerm_public_ip" "maveric_public_ip" {
   sku                 = "Standard" # Use Standard SKU
 }
 
-# Network Security Group (NSG) to allow SSH traffic
+# Network Security Group (NSG) with additional ports
 resource "azurerm_network_security_group" "maveric_nsg" {
   name                = "maveric-nsg"
   location            = azurerm_resource_group.maveric.location
   resource_group_name = azurerm_resource_group.maveric.name
 
+  # Rule for SSH (port 22)
   security_rule {
     name                       = "allow-ssh"
     priority                   = 100
@@ -48,6 +63,71 @@ resource "azurerm_network_security_group" "maveric_nsg" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
+    source_address_prefix      = "*" # Allow all IPs (or specify your IP)
+    destination_address_prefix = "*"
+  }
+
+  # Rule for port 3000 (Frontend)
+  security_rule {
+    name                       = "allow-port-3000"
+    priority                   = 110
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3000"
+    source_address_prefix      = "*" # Allow all IPs (or specify your IP)
+    destination_address_prefix = "*"
+  }
+
+  # Rule for port 4004 (Caretaker Service)
+  security_rule {
+    name                       = "allow-port-4004"
+    priority                   = 120
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "4004"
+    source_address_prefix      = "*" # Allow all IPs (or specify your IP)
+    destination_address_prefix = "*"
+  }
+
+  # Rule for port 4000 (Auth Service)
+  security_rule {
+    name                       = "allow-port-4000"
+    priority                   = 130
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "4000"
+    source_address_prefix      = "*" # Allow all IPs (or specify your IP)
+    destination_address_prefix = "*"
+  }
+
+  # Rule for port 3001 (Middleware)
+  security_rule {
+    name                       = "allow-port-3001"
+    priority                   = 140
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3001"
+    source_address_prefix      = "*" # Allow all IPs (or specify your IP)
+    destination_address_prefix = "*"
+  }
+
+  # Rule for port 4002 (Medication Service)
+  security_rule {
+    name                       = "allow-port-4002"
+    priority                   = 150
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "4002"
     source_address_prefix      = "*" # Allow all IPs (or specify your IP)
     destination_address_prefix = "*"
   }
@@ -86,7 +166,7 @@ resource "azurerm_linux_virtual_machine" "maveric_vm" {
 
   admin_ssh_key {
     username   = "azureuser"
-    public_key = file("${path.module}/week1-dev.pub") # Use the public key
+    public_key = file(var.public_key_path) # Updated to use the variable
   }
 
   os_disk {
@@ -100,6 +180,22 @@ resource "azurerm_linux_virtual_machine" "maveric_vm" {
     sku       = "18.04-LTS" # Free tier eligible
     version   = "latest"
   }
+
+  # Optional: Connection block for provisioners
+  connection {
+    type        = "ssh"
+    user        = "azureuser"
+    private_key = file(var.private_key_path) # Use the private key for SSH
+    host        = azurerm_public_ip.maveric_public_ip.ip_address
+  }
+
+  # Optional: Provisioner to test SSH
+  provisioner "remote-exec" {
+    inline = [
+      "echo 'SSH connection successful' > /tmp/terraform_test.txt",
+      "sudo apt update -y"
+    ]
+  }
 }
 
 # Azure Container Registry (ACR)
@@ -110,4 +206,35 @@ resource "azurerm_container_registry" "maveric_acr" {
   sku                 = "Basic" # Cost-friendly ACR SKU
   admin_enabled       = true
 }
+#remote-exec
+resource "azurerm_linux_virtual_machine" "maveric_vm" {
+  name                = "maveric-vm"
+  resource_group_name = azurerm_resource_group.maveric.name
+  location            = azurerm_resource_group.maveric.location
+  size                = "Standard_B1s"
+  admin_username      = "azureuser"
+  network_interface_ids = [azurerm_network_interface.maveric_nic.id]
 
+  admin_ssh_key {
+    username   = "azureuser"
+    public_key = file(var.public_key_path)
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "UbuntuServer"
+    sku       = "18.04-LTS"
+    version   = "latest"
+  }
+
+  connection {
+    type        = "ssh"
+    user        = "azureuser"
+    private_key = file(var.private_key_path)
+    host        = azurerm_public_ip.maveric_public_ip.ip_address
+  }
