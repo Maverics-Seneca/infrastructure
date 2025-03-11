@@ -1,0 +1,53 @@
+---
+- name: Deploy Terraform on Azure
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    terraform_directory: "/home/azureuser/terraform"  # Update with your path
+
+  tasks:
+    - name: Install required dependencies
+      package:
+        name: 
+          - unzip
+          - wget
+        state: present
+
+    - name: Check if Terraform is installed
+      command: terraform --version
+      register: terraform_installed
+      ignore_errors: yes
+
+    - name: Download Terraform binary
+      get_url:
+        url: "https://releases.hashicorp.com/terraform/1.6.0/terraform_1.6.0_linux_amd64.zip"
+        dest: "/tmp/terraform.zip"
+      when: terraform_installed.rc != 0
+
+    - name: Unzip Terraform
+      unarchive:
+        src: "/tmp/terraform.zip"
+        dest: "/usr/local/bin/"
+        remote_src: yes
+      when: terraform_installed.rc != 0
+
+    - name: Ensure Terraform directory exists
+      file:
+        path: "{{ terraform_directory }}"
+        state: directory
+
+    - name: Copy Terraform configuration to the remote server
+      copy:
+        src: "./terraform/"   # Update with your Terraform code directory
+        dest: "{{ terraform_directory }}"
+    
+    - name: Initialize Terraform
+      command:
+        cmd: terraform init
+        chdir: "{{ terraform_directory }}"
+
+    - name: Apply Terraform
+      command:
+        cmd: terraform apply -auto-approve
+        chdir: "{{ terraform_directory }}"

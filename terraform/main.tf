@@ -206,35 +206,3 @@ resource "azurerm_container_registry" "maveric_acr" {
   sku                 = "Basic" # Cost-friendly ACR SKU
   admin_enabled       = true
 }
-#remote-exec
-resource "azurerm_linux_virtual_machine" "maveric_vm" {
-  name                = "maveric-vm"
-  resource_group_name = azurerm_resource_group.maveric.name
-  location            = azurerm_resource_group.maveric.location
-  size                = "Standard_B1s"
-  admin_username      = "azureuser"
-  network_interface_ids = [azurerm_network_interface.maveric_nic.id]
-
-  admin_ssh_key {
-    username   = "azureuser"
-    public_key = file(var.public_key_path)
-  }
-
-  os_disk {
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-  }
-
-  source_image_reference {
-    publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "18.04-LTS"
-    version   = "latest"
-  }
-
-  connection {
-    type        = "ssh"
-    user        = "azureuser"
-    private_key = file(var.private_key_path)
-    host        = azurerm_public_ip.maveric_public_ip.ip_address
-  }
