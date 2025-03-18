@@ -1,0 +1,60 @@
+name: Build and Push Docker Images from Submodules to ACR
+
+on:
+  push:
+    branches:
+      - staging  # Triggers when the main branch merges to staging
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Main Repository with Submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: true  # Ensures submodules are cloned
+          fetch-depth: 0  # Required for proper branch tracking
+
+      - name: Checkout Submodules to Dev Branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git submodule update --init --recursive
+          git submodule foreach --recursive 'git fetch origin && git checkout dev && git pull origin dev'
+
+      - name: Log in to Azure Container Registry
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.AZURE_ACR_LOGIN_SERVER }}
+          username: ${{ secrets.AZURE_ACR_USERNAME }}
+          password: ${{ secrets.AZURE_ACR_PASSWORD }}
+
+      - name: Build and Push Docker Images from Submodules
+        env:
+          ACR_LOGIN_SERVER: ${{ secrets.AZURE_ACR_LOGIN_SERVER }}
+          IMAGE_TAG: latest  # Can be replaced with dynamic versioning
+
+        run: |
+          # Define submodule directories
+          SERVICES=(
+            "frontend"
+            "middleware"
+            "microservices/affiliate-service"
+            "microservices/auth-service"
+            "microservices/caretaker-service"
+            "microservices/medication-service"
+            "microservices/reminder-service"
+            "microservices/scraper-service"
+          )
+
+          # Loop through each submodule directory, build, and push
+          for SERVICE in "${SERVICES[@]}"; do
+            IMAGE_NAME=$(basename "$SERVICE")  # Extract folder name for image
+            
+            echo "Building and pushing $IMAGE_NAME from dev branch..."
+            
+            docker build -t $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG $SERVICE
+            docker push $ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG
+          done
