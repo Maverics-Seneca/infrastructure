@@ -3,7 +3,7 @@ name: Build and Push Docker Images from Submodules to ACR
 on:
   push:
     branches:
-      - staging  # Triggers when the main branch merges to staging
+      - master  # Triggers when the main branch merges to staging
 
 jobs:
   build-and-push:
