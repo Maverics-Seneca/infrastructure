@@ -3,7 +3,7 @@
 # Provider configuration
 provider "azurerm" {
   features {}
-  subscription_id = "0cb69517-b7d3-4bde-a4b7-3905c5b3d55c" # Your Azure subscription ID
+  subscription_id = "" # Your Azure subscription ID
 }
 
 # Variables for SSH key paths
